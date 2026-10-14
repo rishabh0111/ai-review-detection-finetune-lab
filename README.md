@@ -12,7 +12,7 @@ including fakes from AI models they never saw in training, and compares three fi
 They are measured against a simple bag-of-words baseline, untuned models and people, on three test sets:
 in-distribution, fakes from other AI models (the headline), and short reviews.
 
-**Status:** planning and setup. Progress, decisions and next steps are in [TRACKER.md](TRACKER.md).
+**Status:** baselines in progress (TF-IDF: 98.8% test accuracy). Progress, decisions and next steps are in [TRACKER.md](TRACKER.md).
 
 ## Data
 

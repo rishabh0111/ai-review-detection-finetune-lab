@@ -5,8 +5,11 @@ session, update it: tick boxes, move "Next steps", log decisions and runs, appen
 
 ## Status
 
-- **Phase:** 0, setup. Repo created, dataset downloaded and committed, plan written. No code yet.
-- **5090 reachable:** `ssh 5090` works with key login (via the 5090's Wi-Fi hotspot, see Risks). Next: Python env.
+- **Phase:** 1, baselines. TF-IDF baseline done (98.8% test accuracy, run on the work laptop). Shared code in
+  `src/rd/` (data loading, metrics, results writer).
+- **Blocked on the user:** the 5090 stopped answering SSH mid-session (port proxy accepts, sshd behind it resets:
+  WSL most likely shut down). uv 0.13.1 is installed and the repo is cloned at `~/ai-review-detection-finetune-lab`;
+  the Python env is not created yet.
 - **Last updated:** 2026-10-14
 
 ## Constraints (set by the user; don't relitigate)
@@ -90,7 +93,7 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 - [ ] Python env on the 5090 (uv or venv, Python 3.12, torch cu128+), `nvidia-smi` and a torch matmul test
 
 ### 1. Baselines
-- [ ] TF-IDF + logistic regression
+- [x] TF-IDF + logistic regression (`scripts/baseline_tfidf.py`, `results/tfidf.json`)
 - [ ] Qwen3-4B zero-shot
 - [ ] Qwen3.8-27B zero-shot, no reasoning (`RedHatAI/Qwen3.8-27B-INT4`, local on the 5090)
 
@@ -136,6 +139,15 @@ Ratings skew to 5 stars (~60%) in every split.
   and its source real review can sit in different splits (near-paraphrase leakage can't be ruled out; Jaccard < 0.6
   limits it).
 
+## Runs
+
+| Date | Method | Where | Settings | validation acc | test acc | test F1 (AI) | test caught @5% FA | short acc | cross-gen |
+|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-14 | TF-IDF + LR | work laptop, scikit-learn 1.9.1 | word 1-2 grams, min_df=2, sublinear tf; C=30 picked on validation from 0.3-300; seed 0 | 0.9868 | 0.9878 | 0.9877 | 0.9982 | 0.9683 (n=1,231) | not generated yet |
+
+"Caught @5% FA" = share of AI reviews flagged when the threshold is set so 5% of *validation* real reviews are
+flagged (fixed before looking at any test set).
+
 ## Decisions
 
 | Date | Decision | Why |
@@ -146,6 +158,7 @@ Ratings skew to 5 stars (~60%) in every split.
 | 2026-10-14 | Headline metric = cross-generator detection, plus a TF-IDF baseline | Dataset card: bag-of-words reaches ~99% in-distribution, so in-distribution accuracy alone shows nothing |
 | 2026-10-14 | Hardware: RTX 5090 laptop (24 GB VRAM, 64 GB RAM), Windows + WSL2, driven over SSH from the work laptop | No Kaggle: its quota (now 6 h/week) and environment issues cost most of the time in the previous project |
 | 2026-10-14 | Large untuned reference = **Qwen3.8-27B, no reasoning**, local on the 5090 (`RedHatAI/Qwen3.8-27B-INT4`, 19.5 GB). Fine-tune models unchanged | User's choice after research. Constraints: Claude Code only (no API key), so no Claude/API baseline; one local open model. Evidence: Artificial Analysis Intelligence Index v4.3.2, small open models 4-40B (read 2026-10-14): Qwen3.8-27B 34 (max reasoning) / 28 / 26 / 20 (no reasoning), the top small open model. Chinese alternatives that fit 24 GB: Qwen3.5-27B 23/19, Qwen3.6-27B 21/20 (AWQ 18.7 GB), GLM-4.7-Flash 15/11 (AWQ 19.8 GB), ERNIE-4.5-21B-A3B and MiMo-V2.6-Distill-9B (not on the leaderboard). Too big for 24 GB in 4-bit: Qwen3.6-35B-A3B, Intern-S2, all 100B+ Chinese models. Non-Chinese for reference: Gemma-4-26B-A4B 17, gpt-oss-20b 9-10. No reasoning: fastest for ~8,000 reviews and comparable to the fine-tuned models, which don't reason. The index measures general ability, not AI-text detection |
+| 2026-10-14 | Metrics: hard-label accuracy/P/R/F1 at 0.5, plus "caught at 5% false alarms" with the threshold fixed on validation real reviews | A shop sets the threshold before deployment; fixing it on validation keeps test sets untouched. Methods without a score (hard labels only) report the first set; LLMs use the probability of the `ai` answer token as their score |
 | 2026-10-14 | Repo name `ai-review-detection-finetune-lab` | User's choice; neutral across the three methods |
 
 ## Open questions
@@ -164,6 +177,10 @@ Ratings skew to 5 stars (~60%) in every split.
 - **GRPO time:** rollout generation dominates. Keep completions short (~150 tokens), use vLLM for rollouts, LoRA
   on the policy; cap steps to fit the schedule.
 - **Single-generator training data:** detectors may learn DeepSeek's style; the cross-generator set measures this.
+- **WSL sees only 31 GB of the 5090's 64 GB RAM** (WSL default is half). Enough for now; if loading the 27B or
+  GRPO runs out of RAM, set `memory=56GB` in `%UserProfile%\.wslconfig` on the 5090 and `wsl --shutdown`.
+- **WSL stops when idle**, which kills sshd (happened in session 3). Keep it running with the scheduled task in the
+  setup guide, or `vmIdleTimeout=-1` under `[wsl2]` in `.wslconfig`.
 - **SSH path depends on the hotspot.** The work laptop currently reaches the 5090 only through the 5090's Windows
   hotspot (`192.168.137.1`), with a `netsh portproxy` from port 2223 to WSL sshd on 2222. If the hotspot is off or
   its address changes, SSH breaks. With both machines on the office LAN, use `HostName 10.0.0.86`, `Port 2222`
@@ -171,10 +188,13 @@ Ratings skew to 5 stars (~60%) in every split.
 
 ## Next steps
 
-1. User: turn off SSH password login on the 5090 (setup guide, step 6).
-2. Create the Python env on the 5090, clone this repo into the WSL filesystem (`~/`, not `/mnt/c`), run the GPU
-   sanity check (setup guide, section 9).
-3. Write the code for step 1 (baselines) and continue down the schedule.
+1. User, on the 5090: bring WSL back (open the Ubuntu terminal, or `wsl -d Ubuntu-24.04`) and keep it from idling
+   (see Risks); then confirm `ssh 5090 echo ok` from the work laptop. Also turn off SSH password login (setup guide,
+   step 6).
+2. Create the Python env on the 5090 (vLLM first so it picks its torch build, then TRL/PEFT; record exact versions),
+   run the GPU sanity check (setup guide, section 9).
+3. Zero-shot baselines: Qwen3-4B-Instruct-2507 and Qwen3.8-27B (vLLM, score = P(`ai`) from logprobs).
+4. Cross-generator set and ModernBERT fine-tune, then down the schedule.
 
 ## Related
 
@@ -204,3 +224,6 @@ Ratings skew to 5 stars (~60%) in every split.
   `~/.ssh/id_ed25519_5090` and `Host 5090` on the work laptop. Added `/usr/lib/wsl/lib` to PATH at the top of the
   5090's `~/.bashrc` so `ssh 5090 nvidia-smi` works. Published the setup steps as a public gist
   (https://gist.github.com/rishabh0111/65e571b9610119a4dcd0b01639335fd8).
+- **2026-10-14** (session 3): Committed the SSH docs. Installed uv and cloned the repo on the 5090, then lost SSH
+  (WSL likely shut down; also unreachable on LAN `10.0.0.86:2222`). Meanwhile wrote `src/rd/` (data, metrics) and
+  the TF-IDF baseline and ran it on the work laptop: 98.8% test, 96.8% on short reviews, matching the dataset card.

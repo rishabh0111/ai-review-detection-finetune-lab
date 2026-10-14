@@ -39,7 +39,9 @@ memory=48GB
 vmIdleTimeout=-1
 ```
 
-`memory` caps WSL's share of the 64 GB RAM. `vmIdleTimeout=-1` stops WSL shutting down when no terminal is open.
+`memory` caps WSL's share of the 64 GB RAM. `vmIdleTimeout=-1` stops the WSL VM shutting down when idle, but
+Ubuntu itself can still stop shortly after the last terminal closes, taking sshd with it. Keep one WSL process
+running with the log-on task in section 7.
 
 Inside Ubuntu, enable systemd so the SSH server starts with WSL:
 
@@ -123,8 +125,9 @@ sudo systemctl restart ssh
 
 - Keep the 5090 machine powered and not sleeping during runs (Windows power settings: never sleep when
   plugged in).
-- After a reboot, WSL starts on first use. Either log in and open Ubuntu once, or add a Task Scheduler task "at
-  log on" running `wsl.exe -d Ubuntu-24.04 --exec /bin/true`.
+- Keep Ubuntu running so sshd stays up: add a Task Scheduler task "at log on" running
+  `wsl.exe -d Ubuntu-24.04 --exec sleep infinity` (a command that exits, like `/bin/true`, starts Ubuntu and
+  lets it stop again a few seconds later). Or keep an Ubuntu terminal open.
 - Run long jobs inside `tmux` so they survive an SSH disconnect: `sudo apt install -y tmux`, then `tmux new -s train`.
 
 ## 8. If the work laptop can't reach the 5090

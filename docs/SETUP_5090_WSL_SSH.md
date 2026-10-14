@@ -123,6 +123,9 @@ sudo systemctl restart ssh
 
 ## 7. Keep it running
 
+- Pause Windows Update during runs (Settings > Windows Update > Pause). It updates WSL itself, which stops
+  the WSL VM mid-run, and a half-applied WSL update was the likely trigger of a hypervisor crash (bugcheck
+  0x20001) under GPU load on 2026-10-14.
 - Keep the 5090 machine powered and not sleeping during runs (Windows power settings: never sleep when
   plugged in).
 - Keep Ubuntu running so sshd stays up: add a Task Scheduler task "at log on" running
@@ -140,11 +143,13 @@ The hotspot adapter isn't mirrored into WSL, so forward a port on it to sshd (Po
 5090; 2223 because 2222 is already taken by sshd in mirrored mode):
 
 ```powershell
-netsh interface portproxy add v4tov4 listenaddress=192.168.137.1 listenport=2223 connectaddress=127.0.0.1 connectport=2222
+netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=2223 connectaddress=127.0.0.1 connectport=2222
 New-NetFirewallRule -DisplayName "WSL SSH hotspot 2223" -Direction Inbound -Protocol TCP -LocalPort 2223 -Action Allow
 ```
 
-Then use `HostName 192.168.137.1` and `Port 2223` in `~/.ssh/config`. This works only while the hotspot is on. With
+Listen on `0.0.0.0`, not `192.168.137.1`: the hotspot address doesn't exist yet when the forwarding service
+starts at boot, so a forward bound to it silently stops working after a restart. Then use
+`HostName 192.168.137.1` and `Port 2223` in `~/.ssh/config`. This works only while the hotspot is on. With
 both machines on the office LAN, use the 5090's Ethernet address and port 2222 instead.
 
 **Office network blocks the connection:**

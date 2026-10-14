@@ -9,7 +9,17 @@ session, update it: tick boxes, move "Next steps", log decisions and runs, appen
 - **Blocked on the user:** setting up WSL + SSH on the RTX 5090 machine (`docs/SETUP_5090_WSL_SSH.md`).
 - **Last updated:** 2026-10-14
 
-## Goal
+## Constraints (set by the user; don't relitigate)
+
+- **Claude Code only.** No Anthropic API key and no other paid API: every model in the comparison runs locally.
+- **One local open model** as the large untuned reference: Qwen3.8-27B, no reasoning (see Decisions).
+- **One day of work** on one RTX 5090 laptop (24 GB VRAM, 64 GB RAM), Windows + WSL2, driven over SSH from the
+  work laptop. **No Kaggle** (the previous project was stopped because of it).
+- **Showcase in-demand fine-tuning**, not only LoRA; results must make sense to a non-technical reader (recruiters/HR).
+- **Data only from** `Flowerly/modern-fake-reviews` (pinned in `data/raw/`), plus cross-generator fakes we generate.
+- Public repo on GitHub (`rishabh0111`); never commit tokens. The HF token lives on the work laptop only
+  (`~/.cache/huggingface/token`).
+
 
 A one-day portfolio project showcasing in-demand fine-tuning, understandable by a non-technical reader:
 

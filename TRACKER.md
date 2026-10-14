@@ -29,7 +29,7 @@ Audience: recruiters/HR (semi-technical) and engineers. The demo must make sense
 | 1 | Full fine-tune of an encoder classifier | `answerdotai/ModernBERT-base` (Apache-2.0) | Classic, cheap, strong baseline |
 | 2 | Supervised fine-tuning (SFT) with LoRA | `Qwen/Qwen3-4B-Instruct-2507` (Apache-2.0) | Standard LLM fine-tuning (PEFT + TRL `SFTTrainer`) |
 | 3 | GRPO, reinforcement learning with a verifiable reward | same Qwen3-4B, LoRA | The most in-demand post-training technique (DeepSeek-R1 style): the model writes its reasoning, then `real`/`ai`; reward = answer matches the label (+ format). Explanations double as the demo's "why" |
-| - | Untuned references | Qwen3-4B zero-shot; `nvidia/Gemma-4-26B-A4B-NVFP4` zero-shot (local) | Shows what fine-tuning adds |
+| - | Untuned references | Qwen3-4B zero-shot; **Qwen3.8-27B** zero-shot, no reasoning (local, `RedHatAI/Qwen3.8-27B-INT4`) | Shows what fine-tuning adds; Qwen3.8-27B is the highest-scoring small open model |
 | - | People | ~50 test reviews guessed by a few people | The relatable number for the pitch |
 
 ### Evaluation (decided before training)
@@ -39,10 +39,10 @@ Audience: recruiters/HR (semi-technical) and engineers. The demo must make sense
 2. **Cross-generator (headline):** fakes from 2-3 open models *not* used in the dataset, generated on the 5090
    with the dataset's protocol: grounded on a held-out real review from `test` (same category + star rating,
    length-matched, word-set Jaccard < 0.6). ~500 fakes per generator, paired with the real reviews they were
-   grounded on. Generators: 2-3 models that fit 24 GB, from families not used as detectors, chosen on the 5090
-   (record exact ids). Candidates: `ibm-granite/granite-4.2-8b`, a 4-bit `Qwen3.6-27B` (e.g.
-   `Alennnndy/Qwen3.6-27B-AWQ-4bit`, 18.7 GB), `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16`. Never Gemma (the
-   reference detector), so no model judges its own family's writing.
+   grounded on. Generators: 2-3 models that fit 24 GB, from families not used as detectors (so **not Qwen**:
+   the fine-tuned model and the reference are both Qwen), chosen on the 5090 (record exact ids). Candidates:
+   `ibm-granite/granite-4.2-8b`, `google/gemma-4-12B-it`, `zai-org/GLM-4.7-Flash` (4-bit AWQ),
+   `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16`.
 3. **Short reviews:** `test` reviews of <= 20 words, the hard case named on the dataset card.
 4. Metrics: accuracy, precision/recall/F1 for the AI class, and the share of AI fakes caught at a fixed 5% false
    alarm rate on real reviews (what a shop would actually tune for).
@@ -81,7 +81,7 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 ### 1. Baselines
 - [ ] TF-IDF + logistic regression
 - [ ] Qwen3-4B zero-shot
-- [ ] `nvidia/Gemma-4-26B-A4B-NVFP4` zero-shot (local on the 5090)
+- [ ] Qwen3.8-27B zero-shot, no reasoning (`RedHatAI/Qwen3.8-27B-INT4`, local on the 5090)
 
 ### 2. Cross-generator test set
 - [ ] Pick 2-3 generators that fit 24 GB; generate ~500 grounded fakes each; filter (length, Jaccard < 0.6)
@@ -134,7 +134,7 @@ Ratings skew to 5 stars (~60%) in every split.
 | 2026-10-14 | Compare three fine-tuning approaches (ModernBERT full FT, SFT+LoRA, GRPO+LoRA) | User asked for the most in-demand fine-tuning, not limited to LoRA. GRPO/RLVR is the current in-demand technique; the comparison shows judgement about cost vs benefit |
 | 2026-10-14 | Headline metric = cross-generator detection, plus a TF-IDF baseline | Dataset card: bag-of-words reaches ~99% in-distribution, so in-distribution accuracy alone shows nothing |
 | 2026-10-14 | Hardware: RTX 5090 laptop (24 GB VRAM, 64 GB RAM), Windows + WSL2, driven over SSH from the work laptop | No Kaggle: its quota (now 6 h/week) and environment issues cost most of the time in the previous project |
-| 2026-10-14 | Large untuned reference = `nvidia/Gemma-4-26B-A4B-NVFP4`, run locally (fine-tune models unchanged) | User asked for the best local reference model for 24 GB after research into 2026 releases. Weights must stay under ~20 GB (CUDA context + KV cache). Gemma-4-26B-A4B NVFP4: 18.8 GB, MoE (4B active, fast), native FP4 on Blackwell, Apache-2.0, Mar 2026. Ruled out on size: Qwen3.8-27B (4-bit community quants 18.6-21 GB, dense), Qwen3.6-35B-A3B NVFP4 (23.4 GB), Gemma-4-31B (>=23.3 GB 4-bit). Supersedes gpt-oss-20b (Aug 2025) |
+| 2026-10-14 | Large untuned reference = **Qwen3.8-27B, no reasoning**, local on the 5090 (`RedHatAI/Qwen3.8-27B-INT4`, 19.5 GB). Fine-tune models unchanged | User's choice after research. Constraints: Claude Code only (no API key), so no Claude/API baseline; one local open model. Evidence: Artificial Analysis Intelligence Index v4.3.2, small open models 4-40B (read 2026-10-14): Qwen3.8-27B 34 (max reasoning) / 28 / 26 / 20 (no reasoning), the top small open model. Chinese alternatives that fit 24 GB: Qwen3.5-27B 23/19, Qwen3.6-27B 21/20 (AWQ 18.7 GB), GLM-4.7-Flash 15/11 (AWQ 19.8 GB), ERNIE-4.5-21B-A3B and MiMo-V2.6-Distill-9B (not on the leaderboard). Too big for 24 GB in 4-bit: Qwen3.6-35B-A3B, Intern-S2, all 100B+ Chinese models. Non-Chinese for reference: Gemma-4-26B-A4B 17, gpt-oss-20b 9-10. No reasoning: fastest for ~8,000 reviews and comparable to the fine-tuned models, which don't reason. The index measures general ability, not AI-text detection |
 | 2026-10-14 | Repo name `ai-review-detection-finetune-lab` | User's choice; neutral across the three methods |
 
 ## Open questions
@@ -144,9 +144,10 @@ Ratings skew to 5 stars (~60%) in every split.
 
 ## Risks
 
-- **NVFP4 on the laptop 5090 (sm_120) in vLLM:** check in hour 1. Fallbacks: `philbert440/Qwen3.8-27B-W4A16-AWQ`
-  (19.5 GB) or `openai/gpt-oss-20b` (~13 GB MXFP4).
-
+- **Qwen3.8-27B fit on 24 GB:** 19.5 GB of 4-bit weights (includes the vision encoder) leaves ~3 GB for KV cache
+  and CUDA context. Reviews are short, so cap `max_model_len` (~2048). Fallbacks in order:
+  `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (17.9 GB, unknown uploader: check its card), then
+  `Alennnndy/Qwen3.6-27B-AWQ-4bit` (18.7 GB). Also check how its "no reasoning" mode is switched (chat-template flag).
 - **RTX 50 (Blackwell, sm_120) needs CUDA 12.8+ builds** of PyTorch, vLLM and flash-attention; older wheels fail
   with "no kernel image". Check in the first hour.
 - **GRPO time:** rollout generation dominates. Keep completions short (~150 tokens), use vLLM for rollouts, LoRA
@@ -172,4 +173,4 @@ Ratings skew to 5 stars (~60%) in every split.
   public repo, downloaded the dataset at a pinned revision, checked split overlap, wrote this tracker, the README,
   CLAUDE.md and the 5090 WSL/SSH setup guide.
 - **2026-10-14** (session 1, cont.): Chose `openai/gpt-oss-20b` as the local large reference. Stopped all Kaggle work on the old project.
-- **2026-10-14** (session 1, cont.): Researched 2026 open models that fit 24 GB; large local reference is now Gemma-4-26B-A4B-NVFP4 (fallbacks under Risks). Fine-tune models stay Qwen3-4B-Instruct-2507 and ModernBERT-base (user's call).
+- **2026-10-14** (session 1, cont.): Researched 2026 open models that fit 24 GB, including all major Chinese labs, against the Artificial Analysis small-model leaderboard. User ruled out API models (Claude Code only) and chose Qwen3.8-27B, no reasoning, as the one local reference. Fine-tune models stay Qwen3-4B-Instruct-2507 and ModernBERT-base.

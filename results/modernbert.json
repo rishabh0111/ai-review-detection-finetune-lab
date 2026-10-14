@@ -1,0 +1,56 @@
+{
+  "method": "modernbert",
+  "written_at": "2026-10-14T10:43:54+00:00",
+  "meta": {
+    "dataset": "Flowerly/modern-fake-reviews",
+    "dataset_revision": "bf57dfbbfa532f44ab26509e644329af00ff904a",
+    "model": "answerdotai/ModernBERT-base",
+    "model_revision": "8949b909ec900327062f0ebf497f51aef5e6f0c8",
+    "transformers": "5.17.0",
+    "torch": "2.13.0+cu132",
+    "seed": 0,
+    "epochs": 2.0,
+    "lr": 5e-05,
+    "batch_size": 32,
+    "max_len": 640,
+    "best_checkpoint": "runs/modernbert/checkpoint-2022",
+    "best_validation_accuracy": 0.9946391752577319,
+    "train_seconds": 722,
+    "threshold_5pct_false_alarm": 9.461262379772961e-05
+  },
+  "results": {
+    "validation": {
+      "n": 2425,
+      "n_ai": 1238,
+      "accuracy": 0.9946391752577319,
+      "precision_ai": 0.9951495553759094,
+      "recall_ai": 0.994345718901454,
+      "f1_ai": 0.9947474747474748,
+      "false_alarm_rate": 0.005054759898904802,
+      "caught_at_5pct_false_alarm": 0.9975767366720517,
+      "false_alarm_at_that_threshold": 0.04970513900589722
+    },
+    "test": {
+      "n": 5660,
+      "n_ai": 2802,
+      "accuracy": 0.9975265017667845,
+      "precision_ai": 0.9967925873129009,
+      "recall_ai": 0.9982155603140613,
+      "f1_ai": 0.9975035663338089,
+      "false_alarm_rate": 0.0031490552834149755,
+      "caught_at_5pct_false_alarm": 1.0,
+      "false_alarm_at_that_threshold": 0.04688593421973408
+    },
+    "test_short": {
+      "n": 1231,
+      "n_ai": 671,
+      "accuracy": 0.9935012185215272,
+      "precision_ai": 0.9925705794947994,
+      "recall_ai": 0.9955290611028316,
+      "f1_ai": 0.9940476190476191,
+      "false_alarm_rate": 0.008928571428571428,
+      "caught_at_5pct_false_alarm": 1.0,
+      "false_alarm_at_that_threshold": 0.16785714285714284
+    }
+  }
+}

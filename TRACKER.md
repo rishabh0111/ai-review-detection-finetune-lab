@@ -101,7 +101,7 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 - [ ] Pick 2-3 generators that fit 24 GB; generate ~500 grounded fakes each; filter (length, Jaccard < 0.6)
 
 ### 3. Fine-tunes
-- [ ] ModernBERT-base full fine-tune
+- [x] ModernBERT-base full fine-tune (`scripts/train_modernbert.py`, `results/modernbert.json`)
 - [ ] Qwen3-4B SFT + LoRA
 - [ ] Qwen3-4B GRPO + LoRA
 
@@ -144,6 +144,7 @@ Ratings skew to 5 stars (~60%) in every split.
 | Date | Method | Where | Settings | validation acc | test acc | test F1 (AI) | test caught @5% FA | short acc | cross-gen |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-10-14 | TF-IDF + LR | work laptop, scikit-learn 1.9.1 | word 1-2 grams, min_df=2, sublinear tf; C=30 picked on validation from 0.3-300; seed 0 | 0.9868 | 0.9878 | 0.9877 | 0.9982 | 0.9683 (n=1,231) | not generated yet |
+| 2026-10-14 | ModernBERT-base full FT | 5090, transformers 5.17.0, torch 2.13.0+cu132 | `answerdotai/ModernBERT-base` @ `8949b909`; input = category + rating + review, max 640 tokens; 2 epochs, lr 5e-5, batch 32, linear decay, 6% warmup, bf16 mixed; best of evals every 200 steps on validation (= last step 2022); 722 s; seed 0 | 0.9946 | 0.9975 | 0.9975 | 1.0000 | 0.9935 (n=1,231) | not generated yet |
 
 "Caught @5% FA" = share of AI reviews flagged when the threshold is set so 5% of *validation* real reviews are
 flagged (fixed before looking at any test set).

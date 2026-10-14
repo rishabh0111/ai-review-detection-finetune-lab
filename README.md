@@ -5,9 +5,9 @@ including fakes from AI models they never saw in training, and compares three fi
 
 | Method | Model |
 |---|---|
-| Full fine-tune of an encoder classifier | ModernBERT-base |
-| Supervised fine-tuning with LoRA | Qwen3-4B-Instruct-2507 |
-| GRPO (reinforcement learning with a verifiable reward; the model explains its verdict) | Qwen3-4B-Instruct-2507 |
+| Full fine-tune of an encoder classifier | ModernBERT-large |
+| Supervised fine-tuning with LoRA | Qwen3.5-4B |
+| GRPO (reinforcement learning with a verifiable reward; the model explains its verdict) | Qwen3.5-4B |
 
 They are measured against a simple bag-of-words baseline, untuned models and people, on three test sets:
 in-distribution, fakes from other AI models (the headline), and short reviews.

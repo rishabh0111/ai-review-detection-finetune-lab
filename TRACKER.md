@@ -26,10 +26,10 @@ Audience: recruiters/HR (semi-technical) and engineers. The demo must make sense
 | # | Method | Model | Why it's in the showcase |
 |---|---|---|---|
 | 0 | TF-IDF + logistic regression | n/a | The bar to beat. The dataset card says bag-of-words already reaches ~99% in-distribution |
-| 1 | Full fine-tune of an encoder classifier | `answerdotai/ModernBERT-large` (395M, Apache-2.0) | Classic, cheap, strong baseline |
-| 2 | Supervised fine-tuning (SFT) with LoRA | `Qwen/Qwen3.5-4B` (Feb 2026, Apache-2.0) | Standard LLM fine-tuning (PEFT + TRL `SFTTrainer`) |
-| 3 | GRPO, reinforcement learning with a verifiable reward | same Qwen3.5-4B, LoRA | The most in-demand post-training technique (DeepSeek-R1 style): the model writes its reasoning, then `real`/`ai`; reward = answer matches the label (+ format). Explanations double as the demo's "why" |
-| - | Untuned references | Qwen3.5-4B zero-shot; `nvidia/Gemma-4-26B-A4B-NVFP4` zero-shot (local) | Shows what fine-tuning adds |
+| 1 | Full fine-tune of an encoder classifier | `answerdotai/ModernBERT-base` (Apache-2.0) | Classic, cheap, strong baseline |
+| 2 | Supervised fine-tuning (SFT) with LoRA | `Qwen/Qwen3-4B-Instruct-2507` (Apache-2.0) | Standard LLM fine-tuning (PEFT + TRL `SFTTrainer`) |
+| 3 | GRPO, reinforcement learning with a verifiable reward | same Qwen3-4B, LoRA | The most in-demand post-training technique (DeepSeek-R1 style): the model writes its reasoning, then `real`/`ai`; reward = answer matches the label (+ format). Explanations double as the demo's "why" |
+| - | Untuned references | Qwen3-4B zero-shot; `nvidia/Gemma-4-26B-A4B-NVFP4` zero-shot (local) | Shows what fine-tuning adds |
 | - | People | ~50 test reviews guessed by a few people | The relatable number for the pitch |
 
 ### Evaluation (decided before training)
@@ -80,16 +80,16 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 
 ### 1. Baselines
 - [ ] TF-IDF + logistic regression
-- [ ] Qwen3.5-4B zero-shot
+- [ ] Qwen3-4B zero-shot
 - [ ] `nvidia/Gemma-4-26B-A4B-NVFP4` zero-shot (local on the 5090)
 
 ### 2. Cross-generator test set
 - [ ] Pick 2-3 generators that fit 24 GB; generate ~500 grounded fakes each; filter (length, Jaccard < 0.6)
 
 ### 3. Fine-tunes
-- [ ] ModernBERT-large full fine-tune
-- [ ] Qwen3.5-4B SFT + LoRA
-- [ ] Qwen3.5-4B GRPO + LoRA
+- [ ] ModernBERT-base full fine-tune
+- [ ] Qwen3-4B SFT + LoRA
+- [ ] Qwen3-4B GRPO + LoRA
 
 ### 4. Evaluation
 - [ ] All methods x all test sets; human baseline; results table
@@ -134,7 +134,7 @@ Ratings skew to 5 stars (~60%) in every split.
 | 2026-10-14 | Compare three fine-tuning approaches (ModernBERT full FT, SFT+LoRA, GRPO+LoRA) | User asked for the most in-demand fine-tuning, not limited to LoRA. GRPO/RLVR is the current in-demand technique; the comparison shows judgement about cost vs benefit |
 | 2026-10-14 | Headline metric = cross-generator detection, plus a TF-IDF baseline | Dataset card: bag-of-words reaches ~99% in-distribution, so in-distribution accuracy alone shows nothing |
 | 2026-10-14 | Hardware: RTX 5090 laptop (24 GB VRAM, 64 GB RAM), Windows + WSL2, driven over SSH from the work laptop | No Kaggle: its quota (now 6 h/week) and environment issues cost most of the time in the previous project |
-| 2026-10-14 | Models upgraded after researching 2026 releases on the Hub: fine-tune base `Qwen/Qwen3.5-4B`, encoder `ModernBERT-large`, large reference `nvidia/Gemma-4-26B-A4B-NVFP4` | User asked for better models for 24 GB. Weights must stay under ~20 GB (CUDA context + KV cache). Gemma-4-26B-A4B NVFP4: 18.8 GB, MoE (4B active, fast), native FP4 on Blackwell, Apache-2.0. Qwen3.5-4B: newest small Qwen, 9.3 GB bf16, leaves room for GRPO rollouts. Ruled out on size: Qwen3.8-27B (4-bit community quants 18.6-21 GB, dense), Qwen3.6-35B-A3B NVFP4 (23.4 GB), Gemma-4-31B (>=23.3 GB 4-bit), Qwen3.5-9B bf16 (19.3 GB). Earlier pick gpt-oss-20b (Aug 2025) superseded |
+| 2026-10-14 | Large untuned reference = `nvidia/Gemma-4-26B-A4B-NVFP4`, run locally (fine-tune models unchanged) | User asked for the best local reference model for 24 GB after research into 2026 releases. Weights must stay under ~20 GB (CUDA context + KV cache). Gemma-4-26B-A4B NVFP4: 18.8 GB, MoE (4B active, fast), native FP4 on Blackwell, Apache-2.0, Mar 2026. Ruled out on size: Qwen3.8-27B (4-bit community quants 18.6-21 GB, dense), Qwen3.6-35B-A3B NVFP4 (23.4 GB), Gemma-4-31B (>=23.3 GB 4-bit). Supersedes gpt-oss-20b (Aug 2025) |
 | 2026-10-14 | Repo name `ai-review-detection-finetune-lab` | User's choice; neutral across the three methods |
 
 ## Open questions
@@ -144,9 +144,6 @@ Ratings skew to 5 stars (~60%) in every split.
 
 ## Risks
 
-- **Qwen3.5-4B is natively multimodal** (`Qwen3_5ForConditionalGeneration`, 9.3 GB incl. vision tower): check in
-  hour 1 that TRL `SFTTrainer`/`GRPOTrainer` and vLLM run it text-only. Fallback: `Qwen/Qwen3-4B-Instruct-2507`
-  (text-only, proven in the previous project).
 - **NVFP4 on the laptop 5090 (sm_120) in vLLM:** check in hour 1. Fallbacks: `philbert440/Qwen3.8-27B-W4A16-AWQ`
   (19.5 GB) or `openai/gpt-oss-20b` (~13 GB MXFP4).
 
@@ -175,4 +172,4 @@ Ratings skew to 5 stars (~60%) in every split.
   public repo, downloaded the dataset at a pinned revision, checked split overlap, wrote this tracker, the README,
   CLAUDE.md and the 5090 WSL/SSH setup guide.
 - **2026-10-14** (session 1, cont.): Chose `openai/gpt-oss-20b` as the local large reference. Stopped all Kaggle work on the old project.
-- **2026-10-14** (session 1, cont.): Researched 2026 open models that fit 24 GB; upgraded to Qwen3.5-4B (fine-tune), ModernBERT-large (encoder) and Gemma-4-26B-A4B-NVFP4 (large reference), with fallbacks under Risks.
+- **2026-10-14** (session 1, cont.): Researched 2026 open models that fit 24 GB; large local reference is now Gemma-4-26B-A4B-NVFP4 (fallbacks under Risks). Fine-tune models stay Qwen3-4B-Instruct-2507 and ModernBERT-base (user's call).

@@ -1,0 +1,11 @@
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Training outputs and caches; models go to the HF Hub
+runs/
+outputs/
+checkpoints/
+wandb/
+.cache/

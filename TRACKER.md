@@ -5,11 +5,10 @@ session, update it: tick boxes, move "Next steps", log decisions and runs, appen
 
 ## Status
 
-- **Phase:** 1, baselines. TF-IDF baseline done (98.8% test accuracy, run on the work laptop). Shared code in
-  `src/rd/` (data loading, metrics, results writer).
-- **Blocked on the user:** the 5090 stopped answering SSH mid-session (port proxy accepts, sshd behind it resets:
-  WSL most likely shut down). uv 0.13.1 is installed and the repo is cloned at `~/ai-review-detection-finetune-lab`;
-  the Python env is not created yet.
+- **Phase:** 1-3. Done: TF-IDF, ModernBERT fine-tune, Qwen3-4B zero-shot. All scripts written; SFT and GRPO
+  pass short smoke tests on the 5090. Not run yet: Qwen3.8-27B zero-shot (loads and runs; stopped to free the GPU),
+  cross-generator set, SFT and GRPO full runs.
+- **Next session starts with:** SFT on a subset (full epoch is ~3.3 h), then GRPO from the SFT adapter (see Next steps).
 - **Last updated:** 2026-10-14
 
 ## Constraints (set by the user; don't relitigate)
@@ -90,20 +89,23 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 - [x] Split overlap check (see Data)
 - [x] 5090 machine: WSL2 + Ubuntu, NVIDIA driver, SSH from the laptop (guide: `docs/SETUP_5090_WSL_SSH.md`).
   Checked 2026-10-14: `NVIDIA GeForce RTX 5090 Laptop GPU`, 24,463 MiB, Windows driver 617.42
-- [ ] Python env on the 5090 (uv or venv, Python 3.12, torch cu128+), `nvidia-smi` and a torch matmul test
+- [x] Python env on the 5090: uv, Python 3.12, `requirements-5090.txt` (vLLM 0.31.0, torch 2.13.0+cu132, transformers
+  5.17.0, TRL 1.15.0, PEFT 0.21.2); CUDA toolkit 13.2 for runtime kernel builds; bf16 matmul 80 TFLOPS
 
 ### 1. Baselines
 - [x] TF-IDF + logistic regression (`scripts/baseline_tfidf.py`, `results/tfidf.json`)
-- [ ] Qwen3-4B zero-shot
-- [ ] Qwen3.8-27B zero-shot, no reasoning (`RedHatAI/Qwen3.8-27B-INT4`, local on the 5090)
+- [x] Qwen3-4B zero-shot (`scripts/zero_shot.py`, `results/zero_shot_qwen3_4b.json`)
+- [ ] Qwen3.8-27B zero-shot, no reasoning (`RedHatAI/Qwen3.8-27B-INT4`, local on the 5090). Needs `--enforce-eager
+  --gpu-memory-utilization 0.85` (CUDA graph capture hung); ~9 reviews/s, ~18 min for validation + test
 
 ### 2. Cross-generator test set
-- [ ] Pick 2-3 generators that fit 24 GB; generate ~500 grounded fakes each; filter (length, Jaccard < 0.6)
+- [ ] Pick 2-3 generators that fit 24 GB; generate ~500 grounded fakes each; filter (length, Jaccard < 0.6).
+  Script ready (`scripts/gen_cross.py`, the dataset authors' exact prompts and acceptance rules); generators chosen
 
 ### 3. Fine-tunes
 - [x] ModernBERT-base full fine-tune (`scripts/train_modernbert.py`, `results/modernbert.json`)
-- [ ] Qwen3-4B SFT + LoRA
-- [ ] Qwen3-4B GRPO + LoRA
+- [ ] Qwen3-4B SFT + LoRA (`scripts/train_sft.py`; smoke test passed, 0.17 steps/s at batch 16)
+- [ ] Qwen3-4B GRPO + LoRA (`scripts/train_grpo.py`, `scripts/eval_grpo.py`; smoke test passed, 66 s/step)
 
 ### 4. Evaluation
 - [ ] All methods x all test sets; human baseline; results table
@@ -145,6 +147,10 @@ Ratings skew to 5 stars (~60%) in every split.
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-10-14 | TF-IDF + LR | work laptop, scikit-learn 1.9.1 | word 1-2 grams, min_df=2, sublinear tf; C=30 picked on validation from 0.3-300; seed 0 | 0.9868 | 0.9878 | 0.9877 | 0.9982 | 0.9683 (n=1,231) | not generated yet |
 | 2026-10-14 | ModernBERT-base full FT | 5090, transformers 5.17.0, torch 2.13.0+cu132 | `answerdotai/ModernBERT-base` @ `8949b909`; input = category + rating + review, max 640 tokens; 2 epochs, lr 5e-5, batch 32, linear decay, 6% warmup, bf16 mixed; best of evals every 200 steps on validation (= last step 2022); 722 s; seed 0 | 0.9946 | 0.9975 | 0.9975 | 1.0000 | 0.9935 (n=1,231) | not generated yet |
+| 2026-10-14 | Qwen3-4B zero-shot | 5090, vLLM 0.31.0 | `Qwen/Qwen3-4B-Instruct-2507` @ `cdbee75f`; one-word prompt (`src/rd/prompt.py`), greedy, score = P(ai)/(P(ai)+P(real)) from first-token logprobs; every review answered | 0.4705 | 0.4822 | 0.0121 | 0.0061 | 0.4265 (n=1,231) | not generated yet |
+
+Untuned Qwen3-4B answers "real" for nearly everything and ranks AI reviews as *more* human than real ones
+(caught @5% FA below the 5% chance level).
 
 "Caught @5% FA" = share of AI reviews flagged when the threshold is set so 5% of *validation* real reviews are
 flagged (fixed before looking at any test set).
@@ -160,6 +166,8 @@ flagged (fixed before looking at any test set).
 | 2026-10-14 | Hardware: RTX 5090 laptop (24 GB VRAM, 64 GB RAM), Windows + WSL2, driven over SSH from the work laptop | No Kaggle: its quota (now 6 h/week) and environment issues cost most of the time in the previous project |
 | 2026-10-14 | Large untuned reference = **Qwen3.8-27B, no reasoning**, local on the 5090 (`RedHatAI/Qwen3.8-27B-INT4`, 19.5 GB). Fine-tune models unchanged | User's choice after research. Constraints: Claude Code only (no API key), so no Claude/API baseline; one local open model. Evidence: Artificial Analysis Intelligence Index v4.3.2, small open models 4-40B (read 2026-10-14): Qwen3.8-27B 34 (max reasoning) / 28 / 26 / 20 (no reasoning), the top small open model. Chinese alternatives that fit 24 GB: Qwen3.5-27B 23/19, Qwen3.6-27B 21/20 (AWQ 18.7 GB), GLM-4.7-Flash 15/11 (AWQ 19.8 GB), ERNIE-4.5-21B-A3B and MiMo-V2.6-Distill-9B (not on the leaderboard). Too big for 24 GB in 4-bit: Qwen3.6-35B-A3B, Intern-S2, all 100B+ Chinese models. Non-Chinese for reference: Gemma-4-26B-A4B 17, gpt-oss-20b 9-10. No reasoning: fastest for ~8,000 reviews and comparable to the fine-tuned models, which don't reason. The index measures general ability, not AI-text detection |
 | 2026-10-14 | Metrics: hard-label accuracy/P/R/F1 at 0.5, plus "caught at 5% false alarms" with the threshold fixed on validation real reviews | A shop sets the threshold before deployment; fixing it on validation keeps test sets untouched. Methods without a score (hard labels only) report the first set; LLMs use the probability of the `ai` answer token as their score |
+| 2026-10-14 | Cross-generator generators: `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16` (slot 0), `ibm-granite/granite-4.2-8b` (slot 1), `RedHatAI/gemma-4-12B-it-FP8-Dynamic` (slot 2); 700 test real reviews per slot, keep 500 fakes + their source reals | Three non-Qwen families (NVIDIA, IBM, Google) that fit 24 GB; Gemma's bf16 checkpoint is 23.9 GB, so FP8. GLM-4.7-Flash dropped (62 GB). Prompts and acceptance rules copied from the dataset's DATA_PROVENANCE.md |
+| 2026-10-14 | Not using the sibling datasets `Flowerly/modern-fake-reviews-lfm` / `-glm` | Constraint: data only from the main dataset plus our own fakes. They exist (same protocol, LFM2.5-1.2B and GLM-5.2) if the user wants extra unseen-generator test sets |
 | 2026-10-14 | Repo name `ai-review-detection-finetune-lab` | User's choice; neutral across the three methods |
 
 ## Open questions
@@ -180,6 +188,13 @@ flagged (fixed before looking at any test set).
 - **Single-generator training data:** detectors may learn DeepSeek's style; the cross-generator set measures this.
 - **WSL sees only 31 GB of the 5090's 64 GB RAM** (WSL default is half). Enough for now; if loading the 27B or
   GRPO runs out of RAM, set `memory=56GB` in `%UserProfile%\.wslconfig` on the 5090 and `wsl --shutdown`.
+- **Windows Update restarts WSL and may crash the hypervisor.** On 2026-10-14 it updated WSL to 3.0.3.0 mid-session
+  (WSL VM stopped), then the machine hard-crashed (bugcheck 0x20001 HYPERVISOR_ERROR) while the 27B loaded on the
+  GPU, before the update had finished. Pause Windows Update on the 5090. If 0x20001 recurs under GPU load, update
+  the NVIDIA driver (617.42).
+- **SFT and GRPO are slower than planned.** SFT: 0.17 steps/s at batch 16 with gradient checkpointing, so a full
+  epoch (2,022 steps) is ~3.3 h. GRPO: 66 s/step (16 prompts x 8 completions), so 300 steps is ~5.5 h; and 85% of
+  groups had zero reward variance (untuned model mostly says `real`), i.e. little learning signal.
 - **WSL stops when idle**, which kills sshd (happened in session 3). Keep it running with the scheduled task in the
   setup guide, or `vmIdleTimeout=-1` under `[wsl2]` in `.wslconfig`.
 - **SSH path depends on the hotspot.** The work laptop currently reaches the 5090 only through the 5090's Windows
@@ -189,13 +204,19 @@ flagged (fixed before looking at any test set).
 
 ## Next steps
 
-1. User, on the 5090: bring WSL back (open the Ubuntu terminal, or `wsl -d Ubuntu-24.04`) and keep it from idling
-   (see Risks); then confirm `ssh 5090 echo ok` from the work laptop. Also turn off SSH password login (setup guide,
-   step 6).
-2. Create the Python env on the 5090 (vLLM first so it picks its torch build, then TRL/PEFT; record exact versions),
-   run the GPU sanity check (setup guide, section 9).
-3. Zero-shot baselines: Qwen3-4B-Instruct-2507 and Qwen3.8-27B (vLLM, score = P(`ai`) from logprobs).
-4. Cross-generator set and ModernBERT fine-tune, then down the schedule.
+1. Check the 5090: Windows Update paused, `sleep infinity` window open, `ssh 5090 echo ok`. On the 5090:
+   `cd ~/ai-review-detection-finetune-lab && git pull`.
+2. Cross-generator set: run the three `gen_cross.py` lines from `scripts/overnight.sh` (~35-40 min).
+3. SFT: train on a subset to fit ~45 min (e.g. `--max-steps 400` = 6,400 reviews; try `--batch-size 32` and check
+   whether gradient checkpointing can be turned off at this sequence length), then
+   `zero_shot.py --lora runs/sft/adapter`.
+4. GRPO: start from the SFT adapter (more reward variance per group), fewer steps (~100-150 at ~66 s), or fewer
+   prompts per step. vLLM colocate needs `--vllm-memory 0.5` (0.35 leaves no KV cache). Then `eval_grpo.py`.
+5. Rescore TF-IDF, ModernBERT (`--eval-only`), both zero-shot models with the cross-generator set; the 27B with
+   `--enforce-eager --gpu-memory-utilization 0.85`.
+6. Results table, Gradio demo, README; human baseline (~50 reviews, a few people).
+
+`scripts/overnight.sh` queues steps 2-5 unattended (written, not used: the user prefers attended runs).
 
 ## Related
 
@@ -228,3 +249,10 @@ flagged (fixed before looking at any test set).
 - **2026-10-14** (session 3): Committed the SSH docs. Installed uv and cloned the repo on the 5090, then lost SSH
   (WSL likely shut down; also unreachable on LAN `10.0.0.86:2222`). Meanwhile wrote `src/rd/` (data, metrics) and
   the TF-IDF baseline and ran it on the work laptop: 98.8% test, 96.8% on short reviews, matching the dataset card.
+- **2026-10-14** (session 3, cont.): SSH back after the user restarted WSL. Built the 5090 env with uv (vLLM first,
+  then TRL/PEFT; pinned in `requirements-5090.txt`); vLLM also needed `build-essential`, `python3.12-dev` and the
+  CUDA 13.2 toolkit (FlashInfer JIT). ModernBERT: 99.75% test in 12 min. Qwen3-4B zero-shot: 48.2% test. Wrote
+  zero-shot (with LoRA scoring), cross-generator, SFT, GRPO and GRPO-eval scripts; SFT and GRPO smoke tests pass.
+  Lost ~1 h to the 5090: Windows Update restarted WSL, then a hypervisor crash (0x20001) during the 27B load, then
+  the hotspot port forward didn't come back after reboot (now bound to 0.0.0.0, setup guide updated). The 27B
+  loads and runs in eager mode but was stopped to free the GPU for smoke tests; nothing left running on the 5090.

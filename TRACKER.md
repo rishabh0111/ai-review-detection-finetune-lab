@@ -174,8 +174,18 @@ Ratings skew to 5 stars (~60%) in every split.
 
 ## Related
 
-- Previous project: `rishabh0111/tool-calling-qlora-lab` (private), tool-calling QLoRA on Kaggle. **Stopped** on 2026-10-14 (no Kaggle runs active); its
-  `TRACKER.md` has the full history. Reusable pieces: LoRA/TRL training setup, vLLM serving, eval patterns.
+- Previous project (tool-calling QLoRA on Kaggle) was stopped and its repo deleted on 2026-10-14. Lessons that
+  still apply here:
+  - transformers 5.x / TRL 1.x renamed training arguments: `warmup_ratio` -> `warmup_steps` (a float < 1 is a
+    ratio), `group_by_length` -> `train_sampling_strategy="group_by_length"`; `torch_dtype=` -> `dtype=`. Build
+    `SFTConfig` kwargs by checking the dataclass fields rather than assuming names.
+  - TRL `SFTTrainer` casts LoRA weights of *quantized* models to bf16 in `__init__` (harmless on the 5090, which has
+    bf16; it broke fp16 training on T4s).
+  - Tokenizer files saved by transformers 5 can't be read by transformers 4.x (as pinned by vLLM): load the
+    tokenizer from the base model and give vLLM LoRA dirs with only `adapter_config.json` + weights.
+  - Pin exact versions per stack (train / eval / quantize) and check them with a quick import test before long runs.
+  - Give every long step a wall-clock limit and every model request a timeout; one hung request once wasted 11 h.
+  - Write results as each step finishes, so a crash late in a run keeps the earlier numbers.
 
 ## Session log
 

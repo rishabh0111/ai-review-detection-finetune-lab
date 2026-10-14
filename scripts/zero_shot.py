@@ -60,6 +60,7 @@ def main() -> None:
     ap.add_argument("--max-model-len", type=int, default=1024)
     ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
     ap.add_argument("--text-only", action="store_true", help="multimodal checkpoint: reserve no vision inputs")
+    ap.add_argument("--enforce-eager", action="store_true", help="skip CUDA graph capture (hung for the 27B)")
     ap.add_argument("--lora", default=None, help="LoRA adapter dir (adapter_config.json + weights) to score")
     ap.add_argument("--max-lora-rank", type=int, default=64)
     ap.add_argument("--limit", type=int, default=None, help="score only the first N reviews per set (smoke test)")
@@ -74,6 +75,7 @@ def main() -> None:
         gpu_memory_utilization=args.gpu_memory_utilization,
         **({"limit_mm_per_prompt": {"image": 0, "video": 0}} if args.text_only else {}),
         **({"enable_lora": True, "max_lora_rank": args.max_lora_rank} if args.lora else {}),
+        enforce_eager=args.enforce_eager,
         seed=0,
     )
     lora = LoRARequest("adapter", 1, str(Path(args.lora).resolve())) if args.lora else None
@@ -117,6 +119,8 @@ def main() -> None:
             "model": args.model,
             "model_revision": revision,
             "lora": args.lora,
+            "enforce_eager": args.enforce_eager,
+            "gpu_memory_utilization": args.gpu_memory_utilization,
             "vllm": vllm.__version__,
             "chat_template_kwargs": chat_kwargs,
             "decoding": "greedy, 1 token, score = P(ai) / (P(ai) + P(real)) over top-20 first tokens",

@@ -7,6 +7,7 @@ results/modernbert.json. The model input carries category and rating, the same i
 """
 
 import argparse
+import json
 import time
 
 import numpy as np
@@ -23,7 +24,7 @@ from transformers import (
 )
 
 from rd.data import DATASET_ID, DATASET_REVISION, LABEL_NAMES, eval_sets, load_split
-from rd.metrics import classification_metrics, threshold_at_false_alarm, write_results
+from rd.metrics import RESULTS_DIR, classification_metrics, threshold_at_false_alarm, write_results
 from rd.prompt import review_block
 
 MODEL = "answerdotai/ModernBERT-base"
@@ -48,6 +49,7 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--max-len", type=int, default=640)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--eval-only", action="store_true", help="score <out>/best again (e.g. on new test sets)")
     args = ap.parse_args()
 
     revision = HfApi().model_info(MODEL).sha
@@ -88,6 +90,8 @@ def main() -> None:
         seed=args.seed,
         dataloader_num_workers=2,
     )
+    if args.eval_only:
+        model = AutoModelForSequenceClassification.from_pretrained(f"{args.out}/best")
     trainer = Trainer(
         model=model,
         args=targs,
@@ -96,11 +100,15 @@ def main() -> None:
         data_collator=DataCollatorWithPadding(tok),
         compute_metrics=compute_metrics,
     )
-    t0 = time.time()
-    trainer.train()
-    train_seconds = round(time.time() - t0)
-    trainer.save_model(f"{args.out}/best")
-    tok.save_pretrained(f"{args.out}/best")
+    if args.eval_only:
+        previous = json.loads((RESULTS_DIR / "modernbert.json").read_text())["meta"]
+        train_seconds = previous["train_seconds"]
+    else:
+        t0 = time.time()
+        trainer.train()
+        train_seconds = round(time.time() - t0)
+        trainer.save_model(f"{args.out}/best")
+        tok.save_pretrained(f"{args.out}/best")
 
     val_scores = ai_scores(trainer, val_ds)
     threshold = threshold_at_false_alarm(val["label"], val_scores)
@@ -129,8 +137,10 @@ def main() -> None:
             "lr": args.lr,
             "batch_size": args.batch_size,
             "max_len": args.max_len,
-            "best_checkpoint": trainer.state.best_model_checkpoint,
-            "best_validation_accuracy": trainer.state.best_metric,
+            "best_checkpoint": previous["best_checkpoint"] if args.eval_only else trainer.state.best_model_checkpoint,
+            "best_validation_accuracy": (
+                previous["best_validation_accuracy"] if args.eval_only else trainer.state.best_metric
+            ),
             "train_seconds": train_seconds,
             "threshold_5pct_false_alarm": threshold,
         },

@@ -29,7 +29,7 @@ Audience: recruiters/HR (semi-technical) and engineers. The demo must make sense
 | 1 | Full fine-tune of an encoder classifier | `answerdotai/ModernBERT-base` (Apache-2.0) | Classic, cheap, strong baseline |
 | 2 | Supervised fine-tuning (SFT) with LoRA | `Qwen/Qwen3-4B-Instruct-2507` (Apache-2.0) | Standard LLM fine-tuning (PEFT + TRL `SFTTrainer`) |
 | 3 | GRPO, reinforcement learning with a verifiable reward | same Qwen3-4B, LoRA | The most in-demand post-training technique (DeepSeek-R1 style): the model writes its reasoning, then `real`/`ai`; reward = answer matches the label (+ format). Explanations double as the demo's "why" |
-| - | Untuned references | Qwen3-4B zero-shot; a larger model zero-shot | Shows what fine-tuning adds |
+| - | Untuned references | Qwen3-4B zero-shot; `openai/gpt-oss-20b` zero-shot (local, MXFP4) | Shows what fine-tuning adds |
 | - | People | ~50 test reviews guessed by a few people | The relatable number for the pitch |
 
 ### Evaluation (decided before training)
@@ -39,8 +39,9 @@ Audience: recruiters/HR (semi-technical) and engineers. The demo must make sense
 2. **Cross-generator (headline):** fakes from 2-3 open models *not* used in the dataset, generated on the 5090
    with the dataset's protocol: grounded on a held-out real review from `test` (same category + star rating,
    length-matched, word-set Jaccard < 0.6). ~500 fakes per generator, paired with the real reviews they were
-   grounded on. Generators decided at run time from what fits 24 GB (e.g. Llama-3.1-8B, Gemma-3-12B, Mistral-
-   Small-24B quantised); record exact model ids.
+   grounded on. Generators: `cpatonn/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit` plus 1-2 models from other families
+   that fit 24 GB, chosen on the 5090 (record exact ids). Never the reference detector (gpt-oss-20b), so no model
+   judges its own writing.
 3. **Short reviews:** `test` reviews of <= 20 words, the hard case named on the dataset card.
 4. Metrics: accuracy, precision/recall/F1 for the AI class, and the share of AI fakes caught at a fixed 5% false
    alarm rate on real reviews (what a shop would actually tune for).
@@ -79,7 +80,7 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 ### 1. Baselines
 - [ ] TF-IDF + logistic regression
 - [ ] Qwen3-4B zero-shot
-- [ ] Larger model zero-shot (decide: local open model vs API, see open questions)
+- [ ] `openai/gpt-oss-20b` zero-shot (local on the 5090)
 
 ### 2. Cross-generator test set
 - [ ] Pick 2-3 generators that fit 24 GB; generate ~500 grounded fakes each; filter (length, Jaccard < 0.6)
@@ -132,12 +133,11 @@ Ratings skew to 5 stars (~60%) in every split.
 | 2026-10-14 | Compare three fine-tuning approaches (ModernBERT full FT, SFT+LoRA, GRPO+LoRA) | User asked for the most in-demand fine-tuning, not limited to LoRA. GRPO/RLVR is the current in-demand technique; the comparison shows judgement about cost vs benefit |
 | 2026-10-14 | Headline metric = cross-generator detection, plus a TF-IDF baseline | Dataset card: bag-of-words reaches ~99% in-distribution, so in-distribution accuracy alone shows nothing |
 | 2026-10-14 | Hardware: RTX 5090 laptop (24 GB VRAM, 64 GB RAM), Windows + WSL2, driven over SSH from the work laptop | No Kaggle: its quota (now 6 h/week) and environment issues cost most of the time in the previous project |
+| 2026-10-14 | Large untuned reference = `openai/gpt-oss-20b`, run locally | User: open model on the 5090, the best that fits. ~13 GB in MXFP4 (native 4-bit on RTX 50), strongest fit for 24 GB, reasons before answering, name a non-technical reader recognises. Alternatives checked: Qwen3-30B-A3B-Instruct-2507 AWQ (18.1 GB), Qwen3-32B-AWQ (19.3 GB) |
 | 2026-10-14 | Repo name `ai-review-detection-finetune-lab` | User's choice; neutral across the three methods |
 
 ## Open questions
 
-- Larger untuned model for comparison: an API model (needs the user's OK and a key) or a local open model on the
-  5090 (e.g. Qwen3-14B quantised)?
 - Exact cross-generator models (decide on the 5090 by what fits and generates fast).
 - Push models to the HF Hub under `rishabh0111` (token exists on the work laptop at `~/.cache/huggingface/token`).
 
@@ -159,7 +159,7 @@ Ratings skew to 5 stars (~60%) in every split.
 
 ## Related
 
-- Previous project: `rishabh0111/tool-calling-qlora-lab` (private), tool-calling QLoRA on Kaggle. Paused; its
+- Previous project: `rishabh0111/tool-calling-qlora-lab` (private), tool-calling QLoRA on Kaggle. **Stopped** on 2026-10-14 (no Kaggle runs active); its
   `TRACKER.md` has the full history. Reusable pieces: LoRA/TRL training setup, vLLM serving, eval patterns.
 
 ## Session log
@@ -167,3 +167,4 @@ Ratings skew to 5 stars (~60%) in every split.
 - **2026-10-14** (session 1): Chose the project and dataset after checking alternatives on the Hub. Created the
   public repo, downloaded the dataset at a pinned revision, checked split overlap, wrote this tracker, the README,
   CLAUDE.md and the 5090 WSL/SSH setup guide.
+- **2026-10-14** (session 1, cont.): Chose `openai/gpt-oss-20b` as the local large reference. Stopped all Kaggle work on the old project.

@@ -9,3 +9,6 @@ outputs/
 checkpoints/
 wandb/
 .cache/
+
+# Smoke-test results (--limit runs)
+results/smoke_*.json

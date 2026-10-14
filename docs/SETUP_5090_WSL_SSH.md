@@ -156,20 +156,33 @@ the work laptop, then use the machine's Tailscale name or `100.x` address as `Ho
 
 Work in the Linux filesystem (`~/`), not `/mnt/c/...` (much slower for many small files).
 
+System packages. vLLM compiles kernels at runtime: Triton needs a C compiler and the Python headers, FlashInfer
+needs `nvcc`. Install the CUDA toolkit matching torch's CUDA build (13.2 for torch 2.13.0+cu132) from NVIDIA's
+**WSL-Ubuntu** repo, which has no driver package (the driver comes from Windows):
+
 ```bash
-sudo apt install -y git build-essential python3.12-venv
-git clone https://github.com/rishabh0111/ai-review-detection-finetune-lab.git ~/ai-review-detection-finetune-lab
-cd ~/ai-review-detection-finetune-lab
-python3.12 -m venv .venv && source .venv/bin/activate
-# RTX 50 series (Blackwell) needs PyTorch built for CUDA 12.8 or newer:
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-python -c "import torch; print(torch.__version__, torch.cuda.get_device_name(0)); x=torch.randn(4096,4096,device='cuda',dtype=torch.bfloat16); print((x@x).float().abs().mean())"
+sudo apt install -y git tmux build-essential python3.12-dev
+wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb && sudo apt update && sudo apt install -y cuda-toolkit-13-2
+sed -i '1a export PATH=/usr/local/cuda/bin:$PATH CUDA_HOME=/usr/local/cuda' ~/.bashrc
 ```
 
-The project's own requirements get added to the repo when the code is written (see `TRACKER.md`).
+Python env with [uv](https://docs.astral.sh/uv/). vLLM goes first so it picks its own torch build; exact versions
+are in `requirements-5090.txt`:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+git clone https://github.com/rishabh0111/ai-review-detection-finetune-lab.git ~/ai-review-detection-finetune-lab
+cd ~/ai-review-detection-finetune-lab
+uv venv -p 3.12 .venv && source .venv/bin/activate
+uv pip install -r requirements-5090.txt && uv pip install -e .
+python -c "import torch; print(torch.__version__, torch.cuda.get_device_name(0), torch.cuda.get_arch_list())"
+```
+
+The arch list must include `sm_120` (RTX 50 series).
 
 ## Checklist
 
 - [ ] `nvidia-smi` inside Ubuntu shows the RTX 5090
 - [ ] `ssh 5090 nvidia-smi` works from the work laptop with the key, no password
-- [ ] The torch matmul test above prints the GPU name and a number
+- [ ] The torch check above prints the GPU name and `sm_120`

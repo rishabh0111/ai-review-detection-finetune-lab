@@ -103,6 +103,13 @@ Host 5090
     ServerAliveInterval 30
 ```
 
+`nvidia-smi` lives in `/usr/lib/wsl/lib`, which non-interactive SSH commands don't have on PATH. Add it at the
+**top** of `~/.bashrc` inside Ubuntu (Ubuntu's `.bashrc` returns early for non-interactive shells):
+
+```bash
+sed -i '1i export PATH="/usr/lib/wsl/lib:$PATH"' ~/.bashrc
+```
+
 Test: `ssh 5090 nvidia-smi`.
 
 Once key login works, turn off password login inside Ubuntu:
@@ -120,7 +127,24 @@ sudo systemctl restart ssh
   log on" running `wsl.exe -d Ubuntu-24.04 --exec /bin/true`.
 - Run long jobs inside `tmux` so they survive an SSH disconnect: `sudo apt install -y tmux`, then `tmux new -s train`.
 
-## 8. If the office network blocks the connection
+## 8. If the work laptop can't reach the 5090
+
+Check from the work laptop: `Test-NetConnection <5090-IPv4> -Port 2222`. If it fails while
+`Test-NetConnection localhost -Port 2222` succeeds on the 5090, the problem is the network path.
+
+**Work laptop on the 5090's Wi-Fi hotspot** (work laptop has a `192.168.137.x` address, 5090 has `192.168.137.1`).
+The hotspot adapter isn't mirrored into WSL, so forward a port on it to sshd (PowerShell as Administrator, on the
+5090; 2223 because 2222 is already taken by sshd in mirrored mode):
+
+```powershell
+netsh interface portproxy add v4tov4 listenaddress=192.168.137.1 listenport=2223 connectaddress=127.0.0.1 connectport=2222
+New-NetFirewallRule -DisplayName "WSL SSH hotspot 2223" -Direction Inbound -Protocol TCP -LocalPort 2223 -Action Allow
+```
+
+Then use `HostName 192.168.137.1` and `Port 2223` in `~/.ssh/config`. This works only while the hotspot is on. With
+both machines on the office LAN, use the 5090's Ethernet address and port 2222 instead.
+
+**Office network blocks the connection:**
 
 Install Tailscale inside Ubuntu (`curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up`) and on
 the work laptop, then use the machine's Tailscale name or `100.x` address as `HostName`. Check this is allowed by IT.

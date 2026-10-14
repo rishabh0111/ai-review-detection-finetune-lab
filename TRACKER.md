@@ -6,7 +6,7 @@ session, update it: tick boxes, move "Next steps", log decisions and runs, appen
 ## Status
 
 - **Phase:** 0, setup. Repo created, dataset downloaded and committed, plan written. No code yet.
-- **Blocked on the user:** setting up WSL + SSH on the RTX 5090 machine (`docs/SETUP_5090_WSL_SSH.md`).
+- **5090 reachable:** `ssh 5090` works with key login (via the 5090's Wi-Fi hotspot, see Risks). Next: Python env.
 - **Last updated:** 2026-10-14
 
 ## Constraints (set by the user; don't relitigate)
@@ -85,7 +85,8 @@ Rule: `test` and the cross-generator set are never used for training, early stop
 - [x] Public GitHub repo `rishabh0111/ai-review-detection-finetune-lab`
 - [x] Dataset downloaded at a pinned revision and committed (`data/raw/`, see Data)
 - [x] Split overlap check (see Data)
-- [ ] 5090 machine: WSL2 + Ubuntu, NVIDIA driver, SSH from the laptop **(user, guide: `docs/SETUP_5090_WSL_SSH.md`)**
+- [x] 5090 machine: WSL2 + Ubuntu, NVIDIA driver, SSH from the laptop (guide: `docs/SETUP_5090_WSL_SSH.md`).
+  Checked 2026-10-14: `NVIDIA GeForce RTX 5090 Laptop GPU`, 24,463 MiB, Windows driver 617.42
 - [ ] Python env on the 5090 (uv or venv, Python 3.12, torch cu128+), `nvidia-smi` and a torch matmul test
 
 ### 1. Baselines
@@ -163,13 +164,16 @@ Ratings skew to 5 stars (~60%) in every split.
 - **GRPO time:** rollout generation dominates. Keep completions short (~150 tokens), use vLLM for rollouts, LoRA
   on the policy; cap steps to fit the schedule.
 - **Single-generator training data:** detectors may learn DeepSeek's style; the cross-generator set measures this.
-- **WSL networking / office policy** may block inbound SSH; fallback is Tailscale (see setup guide).
+- **SSH path depends on the hotspot.** The work laptop currently reaches the 5090 only through the 5090's Windows
+  hotspot (`192.168.137.1`), with a `netsh portproxy` from port 2223 to WSL sshd on 2222. If the hotspot is off or
+  its address changes, SSH breaks. With both machines on the office LAN, use `HostName 10.0.0.86`, `Port 2222`
+  (setup guide, section 8).
 
 ## Next steps
 
-1. User: follow `docs/SETUP_5090_WSL_SSH.md` on the 5090 machine; confirm `ssh 5090` works from the work laptop.
-2. Then: create the Python env on the 5090, clone this repo into the WSL filesystem (`~/`, not `/mnt/c`), run the
-   GPU sanity check.
+1. User: turn off SSH password login on the 5090 (setup guide, step 6).
+2. Create the Python env on the 5090, clone this repo into the WSL filesystem (`~/`, not `/mnt/c`), run the GPU
+   sanity check (setup guide, section 9).
 3. Write the code for step 1 (baselines) and continue down the schedule.
 
 ## Related
@@ -194,3 +198,9 @@ Ratings skew to 5 stars (~60%) in every split.
   CLAUDE.md and the 5090 WSL/SSH setup guide.
 - **2026-10-14** (session 1, cont.): Chose `openai/gpt-oss-20b` as the local large reference. Stopped all Kaggle work on the old project.
 - **2026-10-14** (session 1, cont.): Researched 2026 open models that fit 24 GB, including all major Chinese labs, against the Artificial Analysis small-model leaderboard. User ruled out API models (Claude Code only) and chose Qwen3.8-27B, no reasoning, as the one local reference. Fine-tune models stay Qwen3-4B-Instruct-2507 and ModernBERT-base.
+- **2026-10-14** (session 2): Set up SSH to the 5090. WSL mirrored networking and sshd on 2222 worked, but the work
+  laptop's Ethernet was unplugged and it was on the 5090's hotspot, so it couldn't reach `10.0.0.86`. Added a
+  `netsh portproxy` (`192.168.137.1:2223` -> `127.0.0.1:2222`) and a firewall rule on the 5090; key
+  `~/.ssh/id_ed25519_5090` and `Host 5090` on the work laptop. Added `/usr/lib/wsl/lib` to PATH at the top of the
+  5090's `~/.bashrc` so `ssh 5090 nvidia-smi` works. Published the setup steps as a public gist
+  (https://gist.github.com/rishabh0111/65e571b9610119a4dcd0b01639335fd8).
